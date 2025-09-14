@@ -1,5 +1,5 @@
 import urllib
-from sqlalchemy import create_engine,text
+from sqlalchemy import create_engine,text,MetaData,Table,insert
 from sqlalchemy.sql import quoted_name
 from typing import List
 from datetime import datetime
@@ -87,76 +87,45 @@ def create_table(connection_str:str,schema_name:str,table_name:str)->bool:
     except:
         return False
 
-def insert_pipeline_row(connection_str: str, schema_name: str, table_name: str, row)->bool:
-    engine = create_engine(connection_str)
-
-    try:
-        with engine.connect() as connection:
-
-            sql = f"""
-                INSERT INTO {schema_name}.{table_name} 
-                (
-                    pipeline_name,
-                    activity_name,
-                    dataset_name,
-                    dataset_type,
-                    linked_service_name,
-                    linked_service_type,
-                    created_date,
-                    updated_date
-                ) 
-                VALUES 
-                (
-                    '{row[0]}',
-                    '{row[1]}',
-                    '{row[2]}', 
-                    '{row[3]}',
-                    '{row[4]}', 
-                    '{row[5]}',
-                    '{row[6]}',
-                    '{row[7]}'
-                )
-            """
-
-            result = connection.execute(text(sql)) 
-            connection.commit()
-
-            return True
-    except:
-        return False
-
 def insert_pipeline_data(connection_str: str, schema_name: str, table_name: str, pipelines: List[PipelineInfo]) -> bool:
-    """
-    Insert flattened pipeline data into SQL Server table.
-    Returns number of rows inserted.
-    """
-    # Flatten the nested structure into list of tuples
-
+    
     rows = []
+
+    now = datetime.now()
 
     for pipeline in pipelines:
         for activity in pipeline.activities:
             for dataset in activity.datasets:
-                row = (
-                    pipeline.name,
-                    activity.name,
-                    dataset.dataset_name,
-                    dataset.dataset_type,
-                    dataset.linked_service_name,
-                    dataset.linked_service_type,
-                    str(datetime.now()),  
-                    str(datetime.now())
-                )
-                rows.append(row)
+                rows.append({
+                    "pipeline_name": pipeline.name,
+                    "activity_name": activity.name,
+                    "dataset_name": dataset.dataset_name,
+                    "dataset_type": dataset.dataset_type,
+                    "linked_service_name": dataset.linked_service_name,
+                    "linked_service_type": dataset.linked_service_type,
+                    "created_date": now,
+                    "updated_date": now,
+                })
 
     if len(rows)==0:
         return True
 
     engine = create_engine(connection_str)
 
-    for row in rows:
-        if not insert_pipeline_row(connection_str=connection_str, schema_name=schema_name, table_name=table_name, row=row):
-            return False
+    metadata = MetaData(schema=schema_name)
+
+    table = Table(table_name, metadata, autoload_with=engine)
+
+    try:
+        with engine.begin() as connection:
+
+            stmt = insert(table)
+
+            connection.execute(stmt,rows)
+
+        return True
+    except:
+        return False
 
     
     return True
