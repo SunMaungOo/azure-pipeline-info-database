@@ -1,0 +1,17 @@
+name: Docker Hub Image CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: checkout
+    - uses: actions/checkout@v4
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag sunmaungoo/azure-pipeline-info-database:latest
+    - name: Push image to docker hub
+      run: |
+          docker login -u ${{secrets.DOCKER_HUB_USER}} -p ${{secrets.DOCKER_HUB_PAT}}
+          docker push sunmaungoo/azure-pipeline-info-database:latest
